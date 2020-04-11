@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import List
 
 import numpy as np
 
@@ -33,7 +34,7 @@ class TAData:
 
     @delta_od.setter
     def delta_od(self, path: Path):
-        self._delta_od_path = path
+        self._delta_od_path = Path(path)
         self._delta_od = np.loadtxt(self._delta_od_path).T
         self.num_pixel, self.num_spectra = self._delta_od.shape
 
@@ -43,7 +44,7 @@ class TAData:
 
     @missed_shots.setter
     def missed_shots(self, path: Path):
-        self._missed_shots_path = path
+        self._missed_shots_path = Path(path)
         self._missed_shots = np.loadtxt(self._missed_shots_path, dtype=np.int)
         (_, self.num_steps) = self._missed_shots.shape
         self._process_missed_shots()
@@ -87,14 +88,64 @@ class TAData:
 
 
 class TCSPCData:
+    DELAYS_FILENAME = "delays.dat"
+
     def __init__(self):
-        pass
+        self._delays_directory_path: Path = None
+        self._delays_files: List[Path] = None
+        self._delays: np.ndarray = None
+
+    @property
+    def delays_directory(self):
+        return self._delays_directory_path
+
+    @delays_directory.setter
+    def delays_directory(self, path: Path):
+        self._delays_directory_path = Path(path)
+        self._delays_files = self._get_delays_files(self._delays_directory_path)
+        self._delays = self._load_delays_from_delays_files(self._delays_files)
+
+    @staticmethod
+    def _get_delays_folders(delays_directory_path: Path) -> List[str]:
+        delays_folder_names = [
+            f for f in os.listdir(delays_directory_path) if not f.startswith(".")
+        ]
+        return sorted(delays_folder_names, key=lambda f: f.lower())
+
+    @staticmethod
+    def _load_delays_from_delays_files(delays_files: List[str]):
+        return [np.loadtxt(delays_file) for delays_file in delays_files]
+        # return np.stack(delays, axis=0)
+
+    @classmethod
+    def _get_delays_files(cls, delays_directory_path: Path) -> List[Path]:
+        delays_folder_names = cls._get_delays_folders(delays_directory_path)
+        delays_files = [
+            delays_directory_path / folder / cls.DELAYS_FILENAME
+            for folder in delays_folder_names
+        ]
+        return delays_files
+
+    @property
+    def delays(self):
+        return self._delays
+
+
+class TATCSCPAnalysis:
+    def __init__(self, ta_data: TAData, tcspc_data: TCSPCData):
+        self.ta_data = ta_data
+        self.tcspc_data = tcspc_data
 
 
 if __name__ == "__main__":
-    tadata = TAData()
-    # tadata.delta_od = "../HQC/HQC_MeOH_387nm_66ns_2001ms_0fs/TA/0001/HQC_MeOH_387nm_NS_2D_DeltaOD_uncor.dat"
-    # tadata.missed_shots = "../HQC/HQC_MeOH_387nm_66ns_2001ms_0fs/TA/0001/HQC_MeOH_387nm_NS_missed_shots.dat"
+    ta_data = TAData()
+    # ta_data.delta_od = "../HQC/HQC_MeOH_387nm_66ns_2001ms_0fs/TA/0001/HQC_MeOH_387nm_NS_2D_DeltaOD_uncor.dat"
+    # ta_data.missed_shots = "../HQC/HQC_MeOH_387nm_66ns_2001ms_0fs/TA/0001/HQC_MeOH_387nm_NS_missed_shots.dat"
+
+    tcspc_data = TCSPCData()
+    tcspc_data.delays_directory = "../HQC/HQC_MeOH_387nm_66ns_2001ms_0fs/TCSPC"
+
+    ana = TATCSCPAnalysis(ta_data, tcspc_data)
 
 quit()
 
