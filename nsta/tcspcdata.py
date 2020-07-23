@@ -11,7 +11,7 @@ class TCSPCData:
     def __init__(self):
         self._delays_directory_path: Path = None
         self._delays_files: List[Path] = None
-        self._delays: np.ndarray = None
+        self._delays: List[np.ndarray] = None
 
     @property
     def delays_directory(self):
