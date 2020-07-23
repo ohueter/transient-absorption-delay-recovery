@@ -57,6 +57,8 @@ class TAData:
     def missed_shots(self, path: Path):
         self._missed_shots_path = Path(path)
         self._missed_shots = np.loadtxt(self._missed_shots_path, dtype=np.int)
+        if len(self._missed_shots.shape) == 1:
+            self._missed_shots = np.array([self._missed_shots])
         (_, self.num_steps) = self._missed_shots.shape
         self._process_missed_shots()
         self._calculate_missed_shots_per_delay_step()
