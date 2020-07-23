@@ -28,6 +28,9 @@ class TATCSCPAnalysis:
         self.unique_delays = None
         self.delay_statistics = None
 
+        self.all_delays_list = None
+        self.tadata_cleaned = None
+
     def remove_pulse_delays_of_missed_shots(pulse_delays: np.ndarray, offset: int):
         pass
 
@@ -40,6 +43,8 @@ class TATCSCPAnalysis:
 
         # all delay times after deleting missed shots
         all_delays = np.array([])
+
+        self.all_delays_list = []
 
         # total missed shots
         n_missed_shots = 0
@@ -95,17 +100,26 @@ class TATCSCPAnalysis:
                     ],
                 )
             )
+            self.all_delays_list.append(
+                delays[
+                    : self.ta_data.num_avg
+                    - num_missed_shots_at_this_idx
+                    - spectra_offset
+                ]
+            )
             spectra_indices_to_delete = np.concatenate(
                 (spectra_indices_to_delete, missing_delays_indices)
             )
 
-        print(len(all_delays))
+        print("num spectra after processing:", len(all_delays))
         return all_delays, spectra_indices_to_delete
 
     def process_data(self, delay_offsets: np.ndarray = None):
         delays, spectra_indices = self.assign_delays_spectra(delay_offsets)
 
         tadata_cleaned = np.delete(self.ta_data.delta_od, spectra_indices, axis=1)
+        self.tadata_cleaned = tadata_cleaned
+
         sorted_indices = np.argsort(delays)
         delays_sorted = delays[sorted_indices]
         tadata_cleaned_sorted = tadata_cleaned[:, sorted_indices]
@@ -144,18 +158,56 @@ class TATCSCPAnalysis:
         x = np.arange(0, wl_max - wl_min)
         spectral_cut = np.mean(delta_od[wl_min:wl_max], axis=1)
 
-        plt.figure()
-        plt.plot(x, spectral_cut)
-        plt.savefig("spectrum.png")
-        plt.close()
+        return x, spectral_cut
+        # plt.figure()
+        # plt.plot(x, spectral_cut)
+        # plt.savefig("spectrum.png")
+        # plt.close()
 
     def plot_transient(self, wl_min: int = None, wl_max: int = None):
         wl_min, wl_max = self._wl_defaults(wl_min, wl_max)
         x = np.arange(0, self.ta_data_processed.shape[1])
         temporal_cut = np.mean(self.ta_data_processed[wl_min:wl_max], axis=0)
 
-        plt.figure()
-        plt.plot(self.tcspc_data_processed[1:-1], temporal_cut[1:-1])
-        plt.savefig("temporal_cut.png")
-        plt.close()
+        return self.tcspc_data_processed[1:-1], temporal_cut[1:-1]
+        # plt.figure()
+        # plt.plot(self.tcspc_data_processed[1:-1], temporal_cut[1:-1])
+        # plt.savefig("temporal_cut.png")
+        # plt.show()
+        # plt.close()
 
+    def plot_step_transient(self, step_no: int, wl_min: int = None, wl_max: int = None):
+        def tadata_indices(all_delays_list, i):
+            """Returns a slice to get spectra based on the index of the delays array."""
+            begin = sum(map(len, all_delays_list[:i]))
+            end = begin + len(all_delays_list[i])
+            return slice(begin, end)
+
+        wl_min, wl_max = self._wl_defaults(wl_min, wl_max)
+
+        sorted_indices = np.argsort(self.all_delays_list[step_no])
+        delays_sorted = self.all_delays_list[step_no][sorted_indices]
+        unique_delays = np.unique(delays_sorted)
+
+        # print("delays_sorted", delays_sorted)
+        # print("len delays_sorted", len(delays_sorted))
+        # print("unique_delays", unique_delays)
+
+        tadata_slice = tadata_indices(self.all_delays_list, step_no)
+        tadata_cleaned_sorted = self.tadata_cleaned[:, tadata_slice][:, sorted_indices]
+
+        # print("shape tadata_cleaned_sorted", tadata_cleaned_sorted.shape)
+
+        tadata_cleaned_sorted_reduced = np.array([])
+        tadata_cleaned_sorted_reduced.shape = (0, self.ta_data.num_pixel)
+        for dt in unique_delays:
+            dt_indices = np.where(delays_sorted == dt)
+            tadata_dt_mean = np.mean(tadata_cleaned_sorted[:, dt_indices[0]], axis=1)
+            tadata_cleaned_sorted_reduced = np.vstack(
+                (tadata_cleaned_sorted_reduced, tadata_dt_mean)
+            )
+        tadata_cleaned_sorted_reduced = tadata_cleaned_sorted_reduced.T
+
+        temporal_cut = np.mean(tadata_cleaned_sorted_reduced[wl_min:wl_max], axis=0)
+
+        return unique_delays, temporal_cut
