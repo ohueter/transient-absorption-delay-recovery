@@ -31,6 +31,18 @@ class TATCSCPAnalysis:
         self.all_delays_list = None
         self.tadata_cleaned = None
 
+        self.s_det_pump = 0
+        self.s_det_probe = 0
+        self.s_el_pump = 0
+        self.s_el_probe = 0
+        self.c = 299792458 * 1e-9  # c in nanoseconds
+        self.fract_c = 0.66  # fraction of c for signal propagation in coaxial cable
+
+    def correct_delays_for_signal_propagation_time(self):
+        optical_delay = (self.s_det_pump - self.s_det_probe) / self.c
+        electrical_delay = (self.s_el_pump - self.s_el_probe) / (self.fract_c * self.c)
+        self.unique_delays = self.unique_delays + optical_delay + electrical_delay
+
     def remove_pulse_delays_of_missed_shots(pulse_delays: np.ndarray, offset: int):
         pass
 
@@ -61,7 +73,7 @@ class TATCSCPAnalysis:
             num_pulse_delays = len(delays)
             if num_pulse_delays < self.ta_data.num_avg:
                 # not enough recorded delay times
-                raise
+                raise ValueError("not enough delay values at idx", idx)
 
             # first delete delays for which no spectra were recorded (because of "missed shots")
             missed_shots_at_this_idx = self.ta_data.missed_shots.T[idx][
