@@ -31,12 +31,21 @@ class TATCSCPAnalysis:
         self.all_delays_list = None
         self.tadata_cleaned = None
 
+        # signal propagation path lengths
         self.s_det_pump = 0
         self.s_det_probe = 0
         self.s_el_pump = 0
         self.s_el_probe = 0
         self.c = 299792458 * 1e-9  # c in nanoseconds
         self.fract_c = 0.66  # fraction of c for signal propagation in coaxial cable
+
+    def set_signal_propagation_pathlengths(
+        self, s_det_pump, s_det_probe, s_el_pump, s_el_probe
+    ):
+        self.s_det_pump = s_det_pump
+        self.s_det_probe = s_det_probe
+        self.s_el_pump = s_el_pump
+        self.s_el_probe = s_el_probe
 
     def correct_delays_for_signal_propagation_time(self):
         optical_delay = (self.s_det_pump - self.s_det_probe) / self.c
